@@ -9,17 +9,17 @@ Create a JSON file (e.g. `streams.json`) in the following format:
 
 ```
 {
-  "station1": "http://url/for/station1",
-  "station2": "http://url/for/station2"
+  "station1": [ "http://url/for/station1", "mp3"],
+  "station2": [ "http://url/for/station2", "aac"]
 }
 ```
 
 Start the server:
 
 ```
-stream-proxy --port 8080 streams.json
+stream-proxy --port 8080 --address=localhost streams.json
 ```
 
 The streams will then be available at "http://localhost:8080/radio/station1.mp3"
-and "http://localhost:8080/radio/station2.mp3".
+and "http://localhost:8080/radio/station2.aac".
 

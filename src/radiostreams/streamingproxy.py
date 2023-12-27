@@ -25,7 +25,7 @@ class RadioStreamHandler(tornado.web.RequestHandler):
         self.streams = streams
 
     @tornado.gen.coroutine
-    def get(self, stream_name):
+    def get(self, stream_name, stream_fmt):
         while True:
             try:
                 logger = logging.getLogger("RadioStreamHandler")
@@ -38,7 +38,9 @@ class RadioStreamHandler(tornado.web.RequestHandler):
                     self.set_status(404)
                     self.finish()
                     return
-                stream_url = self.streams[stream_name]
+                stream_array = self.streams[stream_name]
+                stream_url = stream_array[0]
+                stream_fmt = stream_array[1]
 
                 # build headers to send to server
                 icy_headers = {}
@@ -94,12 +96,13 @@ class RadioStreamHandler(tornado.web.RequestHandler):
             self.set_header(d[0], d[1].strip())
 
 
-def run_server(filename, port=8080):
+def run_server(filename, port=8080, address='localhost'):
     application = tornado.web.Application([
-        (r"/radio/(.*?).mp3", RadioStreamHandler,
+        (r"/radio/([^.]+)\.([^.]+)", RadioStreamHandler,
          dict(streams=load_streams(filename)))
         ])
-    application.listen(port)
+    http_server = tornado.httpserver.HTTPServer(application)
+    http_server.listen(port, address)
     tornado.ioloop.IOLoop.current().start()
 
 
