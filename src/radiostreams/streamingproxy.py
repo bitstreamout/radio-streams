@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import json
 import os
@@ -10,7 +11,6 @@ import tornado.web
 # use pycurl for AsyncHTTPClient
 tornado.httpclient.AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")
 
-
 def load_streams(filename):
     if os.path.exists(filename):
         with open(filename) as f:
@@ -19,55 +19,66 @@ def load_streams(filename):
         streams = {}
     return streams
 
-
 class RadioStreamHandler(tornado.web.RequestHandler):
 
     def initialize(self, streams={}):
         self.streams = streams
 
-    @tornado.web.asynchronous
     @tornado.gen.coroutine
     def get(self, stream_name):
-        logger = logging.getLogger("RadioStreamHandler")
-        logger.debug("Connection from {}".format(self.request.remote_ip))
-        logger.debug("Requested stream: {}".format(stream_name))
+        while True:
+            try:
+                logger = logging.getLogger("RadioStreamHandler")
+                logger.debug("Connection from {}".format(self.request.remote_ip))
+                logger.debug("Requested stream: {}".format(stream_name))
 
-        # get the stream url from config file
-        if stream_name not in self.streams:
-            logger.error("Stream not found: {}".format(stream_name))
-            self.set_status(404)
-            self.finish()
-            return
-        stream_url = self.streams[stream_name]
+                # get the stream url from config file
+                if stream_name not in self.streams:
+                    logger.error("Stream not found: {}".format(stream_name))
+                    self.set_status(404)
+                    self.finish()
+                    return
+                stream_url = self.streams[stream_name]
 
-        # build headers to send to server
-        icy_headers = {}
-        for header in self.request.headers:
-            if header.lower().startswith("icy"):
-                icy_headers[header] = self.request.headers[header]
-                logger.debug("Additional header: '{0}: {1}'".format(header, icy_headers[header]))
+                # build headers to send to server
+                icy_headers = {}
+                for header in self.request.headers:
+                    if header.lower().startswith("icy"):
+                        icy_headers[header] = self.request.headers[header]
+                        logger.debug("Additional header: '{0}: {1}'".format(header, icy_headers[header]))
 
-        # prepare client
-        client = tornado.httpclient.AsyncHTTPClient()
+                # prepare client
+                client = tornado.httpclient.AsyncHTTPClient()
 
-        # resolve redirects
-        request = tornado.httpclient.HTTPRequest(stream_url, method="HEAD",
-                                                 headers=icy_headers,
-                                                 request_timeout=0)
-        response = yield client.fetch(request)
-        if response.effective_url != stream_url:
-            logger.debug("Redirected. New URL: {}".format(response.effective_url))
+                # resolve redirects
+                request = tornado.httpclient.HTTPRequest(stream_url, method="HEAD",
+                                                        headers=icy_headers,
+                                                        request_timeout=0)
+                try:
+                    response = yield client.fetch(request)
+                except tornado.httpclient.HTTPError as e:
+                    pass
+                except Exception as e:
+                    break
+                else:
+                    if response.effective_url != stream_url:
+                        logger.debug("Redirected. New URL: {}".format(response.effective_url))
+                    stream_url = response.effective_url
 
-        stream_url = response.effective_url
-
-        # connect to stream and proxy data to client
-        logger.debug("Starting stream...")
-        request = tornado.httpclient.HTTPRequest(stream_url,
-                                                 headers={"icy-metadata": "1"},
-                                                 streaming_callback=self.stream_callback,
-                                                 header_callback=self.header_callback,
-                                                 request_timeout=0)
-        yield client.fetch(request, self.async_callback)
+                # connect to stream and proxy data to client
+                logger.debug("Starting stream...")
+                request = tornado.httpclient.HTTPRequest(stream_url,
+                                                        headers={"icy-metadata": "1"},
+                                                        streaming_callback=self.stream_callback,
+                                                        header_callback=self.header_callback,
+                                                        request_timeout=0)
+                yield client.fetch(request, self.async_callback)
+            except tornado.httpclient.HTTPError as e:
+                print("HTTPError: "+str(e))
+                break
+            except Exception as e:
+                print(e)
+                break
 
     def async_callback(self, response):
         self.flush()
