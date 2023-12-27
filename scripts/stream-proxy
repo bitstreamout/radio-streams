@@ -18,4 +18,4 @@ if __name__ == "__main__":
         logging.getLogger("RadioStreamHandler").setLevel(logging.DEBUG)
     else:
         logging.getLogger("RadioStreamHandler").setLevel(logging.INFO)
-    run_server(args.streamlist, port=args.port)
+    run_server(args.streamlist, port=args.port, address=args.address)
