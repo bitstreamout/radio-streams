@@ -1,12 +1,16 @@
-import asyncio
 import logging
 import json
 import os
-import tornado.gen
-import tornado.httpclient
-import tornado.ioloop
-import tornado.web
+import asyncio
+import tornado
+from tornado import httputil
 
+def normalize_header(name: str) -> str:
+    if name.startswith("icy-") or name.startswith("ice-audio-info"):
+        return name
+    return "-".join([w.capitalize() for w in name.split("-")])
+
+httputil._normalize_header = normalize_header
 
 # use pycurl for AsyncHTTPClient
 tornado.httpclient.AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")
@@ -61,6 +65,7 @@ class RadioStreamHandler(tornado.web.RequestHandler):
                 except tornado.httpclient.HTTPError as e:
                     pass
                 except Exception as e:
+                    self.finish()
                     break
                 else:
                     if response.effective_url != stream_url:
@@ -82,8 +87,11 @@ class RadioStreamHandler(tornado.web.RequestHandler):
                 print(e)
                 break
 
-    def async_callback(self, response):
-        self.flush()
+    async def async_callback(self, response):
+        try:
+            await self.flush()
+        except tornado.iostream.StreamClosedError:
+            return
 
     def stream_callback(self, chunk):
         self.write(chunk)
@@ -91,10 +99,19 @@ class RadioStreamHandler(tornado.web.RequestHandler):
 
     def header_callback(self, header_line):
         d = header_line.strip().split(":", 1)
-        if len(d) == 2 and (d[0].lower().startswith("icy")
-                            or d[0].lower().startswith("content")):
+        if len(d) != 2:
+            return
+        if d[0].lower().startswith("icy-"):
             self.set_header(d[0], d[1].strip())
-
+        if d[0].lower().startswith("ice-audio-info"):
+            self.set_header(d[0], d[1].strip())
+        if d[0].lower().startswith("content-type"):
+            if d[1].strip() == "audio/aacp":
+                self.set_header(d[0], "audio/aac")
+            else:
+                self.set_header(d[0], d[1].strip())
+        if d[0].lower().startswith("connection"):
+            self.set_header(d[0], d[1].strip())
 
 def run_server(filename, port=8080, address='localhost'):
     application = tornado.web.Application([
@@ -104,7 +121,6 @@ def run_server(filename, port=8080, address='localhost'):
     http_server = tornado.httpserver.HTTPServer(application)
     http_server.listen(port, address)
     tornado.ioloop.IOLoop.current().start()
-
 
 if __name__ == "__main__":
     logging.basicConfig()
