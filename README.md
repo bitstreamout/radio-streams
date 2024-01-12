@@ -7,7 +7,7 @@ This is a fork of the project of **Sven Festersen**:
 > file extension...
 
 Now I had a similar problem with my older **Marantz M-CR610** and the Canadian
-Internet radio station **JB-Radio**[^1]. First of all the **M-CR610** can play
+Internet radio station **JB-Radio**[[1]](#1). First of all the **M-CR610** can play
 flac audio format but not via Internet Radio Option. Beside this the flac is embedded in
 an ogg transport stream.  Nevertheless there are also mp3 and aac streams available.
 The only problem was that the **M-CR610** always disconnect from the resulting
@@ -25,7 +25,8 @@ I now use both the **YCast** self hosted vTuner internet radio service and this 
 proxy as container on my local **NAS**.
 
 ## References
-[^1]: [https://jb-radio.net/](https://jb-radio.net/)
+<a id="1">[1]</a>
+[https://jb-radio.net/](https://jb-radio.net/)
 
 ## Usage
 Create a JSON file (e.g. `streams.json`) in the following format:
